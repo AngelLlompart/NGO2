@@ -14,12 +14,12 @@ public class Singleton<T> : NetworkBehaviour
         {
             if (_instance == null)
             {
-                var objs = FindObjectOfType(typeof(T)) as T[];
+                var objs = FindObjectsOfType(typeof(T)) as T[];
                 if (objs.Length > 0)
                     _instance = objs[0];
                 if (objs.Length > 1)
                 {
-                    Debug.LogError("There is more than oen " + typeof(T).Name + " in the scene.");
+                    Debug.LogError("There is more than one " + typeof(T).Name + " in the scene.");
                 }
 
                 if (_instance == null)

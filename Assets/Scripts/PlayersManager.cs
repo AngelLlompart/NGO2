@@ -13,7 +13,7 @@ public class PlayersManager : Singleton<PlayersManager>
         }
     }
 
-    void Start()
+    private void Start()
     {
         NetworkManager.Singleton.OnClientConnectedCallback += (id) =>
         {

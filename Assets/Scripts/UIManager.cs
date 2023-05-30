@@ -20,7 +20,7 @@ public class UIManager : MonoBehaviour
     
 
     // Start is called before the first frame update
-    void Start()
+    private void Start()
     {
         startServerButton.onClick.AddListener(StartServerClick);
         startHostButton.onClick.AddListener(StartHostClick);
@@ -28,44 +28,29 @@ public class UIManager : MonoBehaviour
     }
 
     // Update is called once per frame
-    void Update()
+    private void Update()
     {
-        //playersInGameText.text = $"Players in game: {PlayersManager.Instance.PlayersInGame}";
+        playersInGameText.text = $"Players in game: {PlayersManager.Instance.PlayersInGame}";
     }
 
     private void StartHostClick()
     {
-        if (NetworkManager.Singleton.StartHost())
-        {
-            Debug.Log("Host started...");
-        }
-        else
-        {
-            Debug.Log("Host started could not be started...");
-        }
+        Debug.Log(NetworkManager.Singleton.StartHost() 
+            ? "Host started..." 
+            : "Host started could not be started...");
     }
     
     private void StartServerClick()
     {
-        if (NetworkManager.Singleton.StartServer())
-        {
-            Debug.Log("Server started...");
-        }
-        else
-        {
-            Debug.Log("Server started could not be started...");
-        }
+        Debug.Log(NetworkManager.Singleton.StartServer()
+            ? "Server started..."
+            : "Server started could not be started...");
     }
     
     private void StartClientClick()
     {
-        if (NetworkManager.Singleton.StartClient())
-        {
-            Debug.Log("Client started...");
-        }
-        else
-        {
-            Debug.Log("Client started could not be started...");
-        }
+        Debug.Log(NetworkManager.Singleton.StartClient()
+            ? "Client started..."
+            : "Client started could not be started...");
     }
 }
