@@ -1,4 +1,4 @@
-using System;
+  using System;
 using System.Collections;
 using System.Collections.Generic;
 using TMPro;
@@ -12,6 +12,9 @@ public class UIManager : MonoBehaviour
     [SerializeField] private Button startHostButton;
     [SerializeField] private Button startClientButton;
     [SerializeField] private TextMeshProUGUI playersInGameText;
+    [SerializeField] private Button executePhysicsButton;
+
+    private bool hasServerStarted;
 
     private void Awake()
     {
@@ -25,6 +28,12 @@ public class UIManager : MonoBehaviour
         startServerButton.onClick.AddListener(StartServerClick);
         startHostButton.onClick.AddListener(StartHostClick);
         startClientButton.onClick.AddListener(StartClientClick);
+        executePhysicsButton.onClick.AddListener(ExecutePhysics);
+
+        NetworkManager.Singleton.OnServerStarted += () =>
+        {
+            hasServerStarted = true; 
+        };
     }
 
     // Update is called once per frame
@@ -37,20 +46,31 @@ public class UIManager : MonoBehaviour
     {
         Debug.Log(NetworkManager.Singleton.StartHost() 
             ? "Host started..." 
-            : "Host started could not be started...");
+            : "Host could not be started...");
     }
     
     private void StartServerClick()
     {
         Debug.Log(NetworkManager.Singleton.StartServer()
             ? "Server started..."
-            : "Server started could not be started...");
+            : "Server could not be started...");
     }
     
     private void StartClientClick()
     {
         Debug.Log(NetworkManager.Singleton.StartClient()
             ? "Client started..."
-            : "Client started could not be started...");
+            : "Client could not be started...");
+    }
+    
+    private void ExecutePhysics()
+    {
+        if (!hasServerStarted)
+        {
+            Debug.Log("Server has not started... ");
+            return;
+        }
+        
+        SpawnerControl.Instance.SpawnObjects();
     }
 }
