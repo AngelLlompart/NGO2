@@ -2,17 +2,22 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Unity.Netcode;
+using Unity.Netcode.Components;
 using UnityEngine;
+using UnityEngine.XR;
 using Random = UnityEngine.Random;
 
-public class PlayerControl : NetworkBehaviour
+[RequireComponent(typeof(NetworkTransform))]
+[RequireComponent(typeof(NetworkObject))]
+public class PlayerControlRaycast : NetworkBehaviour
 {
 
     public enum PlayerState
     {
         Idle,
         Walk,
-        ReverseWalk
+        ReverseWalk,
+        Punch
     }
     
     [SerializeField] private float speed = 3.5f;
@@ -27,6 +32,16 @@ public class PlayerControl : NetworkBehaviour
 
     [SerializeField] private NetworkVariable<PlayerState> networkPlayerState = new NetworkVariable<PlayerState>();
 
+    [SerializeField] private NetworkVariable<float> networkPlayerHealth = new NetworkVariable<float>();
+
+    [SerializeField] private NetworkVariable<float> networkPlayerPunchBlend = new NetworkVariable<float>();
+
+    [SerializeField] private GameObject leftHand;
+
+    [SerializeField] private GameObject rightHand;
+
+    [SerializeField] private float minPunchDistance = 1.0f;
+    
     private CharacterController _characterController;
 
     private Animator _animator;
@@ -62,6 +77,40 @@ public class PlayerControl : NetworkBehaviour
         ClientVisuals();
     }
 
+    private void FixedUpdate()
+    {
+        if (IsClient && IsOwner)
+        {
+            if (networkPlayerState.Value == PlayerState.Punch && ActivePunchActionKey())
+            {
+                CheckPunch(leftHand.transform, Vector3.up);
+                CheckPunch(rightHand.transform, Vector3.up);
+            }
+        }
+    }
+
+    private void CheckPunch(Transform hand, Vector3 aimDirection)
+    {
+        RaycastHit hit;
+
+        int layerMask = LayerMask.GetMask("Player");
+
+        if (Physics.Raycast(hand.position, hand.transform.TransformDirection(aimDirection), out hit, minPunchDistance, layerMask))
+        {
+            Debug.DrawRay(hand.position, hand.transform.TransformDirection(aimDirection) * minPunchDistance, Color.yellow);
+
+            var playerHit = hit.transform.GetComponent<NetworkObject>();
+            if (playerHit != null)
+            {
+                UpdateHealthServerRpc(1, playerHit.OwnerClientId);
+            }
+        }
+        else
+        {
+            Debug.DrawRay(hand.position, hand.transform.TransformDirection(aimDirection) * minPunchDistance, Color.red);
+
+        }
+    }
     private void ClientInput()
     {
         //player position and rotation input
@@ -71,6 +120,12 @@ public class PlayerControl : NetworkBehaviour
         float forwardInput = Input.GetAxis("Vertical");
         Vector3 inputPosition = direction * forwardInput;
 
+        if (ActivePunchActionKey() && forwardInput == 0)
+        {
+            UpdatePlayerStateServerRpc(PlayerState.Punch);
+            return;
+        }
+        
         if (oldInputPosition != inputPosition || oldInputRotation != inputRotation)
         {
             oldInputPosition = inputPosition;
@@ -119,52 +174,23 @@ public class PlayerControl : NetworkBehaviour
         {
             _animator.SetFloat("Walk", 0);
         }
+
+        if (networkPlayerState.Value == PlayerState.Punch)
+        {
+            _animator.SetBool("Punch", true);
+            _animator.SetFloat($"{networkPlayerState.Value}Blend", networkPlayerPunchBlend.Value);
+        }
+        else
+        {
+            _animator.SetBool("Punch", false);
+        }
+    }
+
+    private static bool ActivePunchActionKey()
+    {
+        return Input.GetKey(KeyCode.Space);
     }
     
-    /*private void UpdateServer()
-    {
-        transform.position = new Vector3(transform.position.x + leftRightPosition.Value, transform.position.y,
-            transform.position.z + forwardBackPosition.Value);
-    }*/
-
-    /*private void UpdateClient()
-    {
-        float forwardBackward = 0;
-        float leftRight = 0;
-
-        if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow))
-        {
-            forwardBackward += speed;
-        } 
-        if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow))
-        {
-            forwardBackward -= speed;
-        } 
-        if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow))
-        {
-            leftRight -= speed;
-        } 
-        if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow))
-        {
-            leftRight += speed;
-        }
-
-        if (oldForwardBackPosition != forwardBackward || oldLeftRightPosition != leftRight)
-        {
-            oldForwardBackPosition = forwardBackward;
-            oldLeftRightPosition = leftRight;
-            //update the server
-            UpdateClientPositionServerRpc(forwardBackward, leftRight);
-        }
-    }*/
-
-    /*[ServerRpc]
-    public void UpdateClientPositionServerRpc(float forwardBackward, float leftRight)
-    {
-        forwardBackPosition.Value = forwardBackward;
-        leftRightPosition.Value = leftRight;
-    }*/
-
     [ServerRpc]
     public void UpdateClientPositionAndRotationServerRpc(Vector3 newPosition, Vector3 newRotation)
     {
@@ -173,9 +199,43 @@ public class PlayerControl : NetworkBehaviour
     }
 
     [ServerRpc]
+    public void UpdateHealthServerRpc(int takeAwayPoint, ulong clientId)
+    {
+        var clientWithDamaged = NetworkManager.Singleton.ConnectedClients[clientId]
+            .PlayerObject.GetComponent<PlayerControlRaycast>();
+        
+        if (clientWithDamaged != null && clientWithDamaged.networkPlayerHealth.Value > 0)
+        {
+            clientWithDamaged.networkPlayerHealth.Value -= takeAwayPoint;
+        }
+        
+        //execute method on a client getting punch
+        NotifyHealthChangedClientRpc(takeAwayPoint, new ClientRpcParams
+        {
+            Send = new ClientRpcSendParams
+            {
+                TargetClientIds = new ulong[] {clientId}
+            }
+        });
+    }
+
+    [ClientRpc]
+    public void NotifyHealthChangedClientRpc(int takeAwayPoint, ClientRpcParams clientRpcParams = default)
+    {
+        if(IsOwner) return;
+        
+        Logger.Instance.LogInfo($"Client got punch {takeAwayPoint}");
+    }
+    
+    [ServerRpc]
     public void UpdatePlayerStateServerRpc(PlayerState state)
     {
         networkPlayerState.Value = state;
+
+        if (state == PlayerState.Punch)
+        {
+            networkPlayerPunchBlend.Value = Random.Range(0.0f, 1.0f);
+        }
     }
     
 }

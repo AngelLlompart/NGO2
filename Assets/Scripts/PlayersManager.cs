@@ -1,7 +1,7 @@
 using Unity.Netcode;
 using UnityEngine;
 
-public class PlayersManager : Singleton<PlayersManager>
+public class PlayersManager : NetworkSingleton<PlayersManager>
 {
     private NetworkVariable<int> playersInGame = new NetworkVariable<int>();
 

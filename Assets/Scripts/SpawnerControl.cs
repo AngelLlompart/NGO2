@@ -5,7 +5,7 @@ using Unity.Netcode;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-public class SpawnerControl : Singleton<SpawnerControl>
+public class SpawnerControl : NetworkSingleton<SpawnerControl>
 {
     [SerializeField] private GameObject objectPrefab;
 
